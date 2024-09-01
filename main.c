@@ -1,10 +1,29 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 
 #define SCREEN_WIDTH 1400
 #define SCREEN_HEIGHT 900
+
+#define PLAYER_START_POS_X 0
+#define PLAYER_START_POS_Y 0
+
+#define PLAYER_WIDTH 75
+#define PLAYER_HEIGHT 75
+#define BULLET_WIDTH 25
+#define BULLET_HEIGHT 25
+
+#define PLAYER_HEALTH 100
+#define HOME_HEALTH 300
+#define ENEMY_HEALTH 20
+#define PLAYER_BULLET_POW 10
+#define ENEMY_BULLET_POW 10
+
+#define PLAYER_SPEED 5
+#define BULLET_SPEED 8
+#define ENEMY_SPEED 0.1
 
 struct App
 {
@@ -21,6 +40,22 @@ struct Entity
     SDL_Texture *texture;
 };
 
+struct Player
+{
+    struct Entity entity;
+    int dx;
+    int dy;
+    int self_health;
+    int home_health;
+};
+
+struct Enemy
+{
+    struct Entity entity;
+    int health;
+    struct Enemy *next;
+};
+
 struct Bullet
 {
     struct Entity entity;
@@ -33,86 +68,15 @@ struct Bullet_Stage
     struct Bullet *tail;
 };
 
-void updatePlayer(struct Entity *player, int x, int y, int w, int h)
+struct Enemy_Stage
 {
-    player->x = x;
-    player->y = y;
-    player->w = w;
-    player->h = h;
-}
+    struct Enemy *head;
+    struct Enemy *tail;
+};
 
-void handleBulletFiring(struct Entity *player, struct Bullet_Stage *stage)
-{
-    struct Bullet *bullet = malloc(sizeof(struct Bullet));
-    bullet->next = NULL;
-    bullet->entity.texture = IMG_LoadTexture(app.renderer, "bullet.png");
-    updatePlayer(&bullet->entity, player->x + player->w, player->y + player->h / 2.5, 25, 25);
-
-    if (!stage->tail) {
-	stage->head = bullet;
-	stage->tail = bullet;
-    } else {
-	stage->tail->next = bullet;
-	stage->tail = bullet;
-    }
-}
-
-void updateCoordinates(struct Entity *player, struct Bullet_Stage *stage, SDL_KeyboardEvent *event)
-{
-    if (event->repeat == 0) {
-	switch (event->keysym.scancode) {
-	case SDL_SCANCODE_UP:
-	    player->y -= 10;
-	    break;
-	case SDL_SCANCODE_DOWN:
-	    player->y += 10;
-	    break;
-	case SDL_SCANCODE_RIGHT:
-	    player->x += 10;
-	    break;
-	case SDL_SCANCODE_LEFT:
-	    player->x -= 10;
-	    break;
-	case SDL_SCANCODE_LCTRL:
-	    handleBulletFiring(player, stage);
-	    break;
-	default:
-	    break;
-	}
-	if (player->y < 0) player->y = 0;
-	if (player->x < 0) player->x = 0;
-    }
-}
-
-void prepareScene()
-{
-    SDL_SetRenderDrawColor(app.renderer, 20, 20, 20, 20);
-    SDL_RenderClear(app.renderer);
-}
-
-void presentScene()
-{
-    SDL_RenderPresent(app.renderer);
-}
-
-void playerListener(struct Entity *player, struct Bullet_Stage *stage)
-{
-    SDL_Event event;
-
-    while (SDL_PollEvent(&event)) {
-	switch (event.type) {
-	case SDL_KEYUP:
-	    updateCoordinates(player, stage, &event.key);
-	    break;
-	case SDL_QUIT:
-	    exit(0);
-	    break;
-	default:
-	    break;
-	}
-    }
-}
-
+/*
+ * SDL Initializers
+ */
 SDL_Window *initialize_window(void)
 {
     int windowFlags = 0;
@@ -139,6 +103,85 @@ SDL_Renderer *initialize_renderer(SDL_Window *window)
     return renderer;
 }
 
+/*
+ * SDL Scene
+ */
+void prepareScene()
+{
+    SDL_SetRenderDrawColor(app.renderer, 20, 20, 20, 20);
+    SDL_RenderClear(app.renderer);
+}
+
+void presentScene()
+{
+    SDL_RenderPresent(app.renderer);
+}
+
+/*
+ * Helpers
+ */
+int spawn()
+{
+    int n = rand() % 1001;
+    if (n <= 990) return 0;
+    return 1;
+}
+
+int get_spawn_coordinate()
+{
+    return rand() % SCREEN_HEIGHT;
+}
+
+/*
+ * Game objects initializers
+ */
+void initializePlayer(struct Player *player)
+{
+    player->entity.texture = IMG_LoadTexture(app.renderer, "aircraft.png");
+    player->entity.x = PLAYER_START_POS_X;
+    player->entity.y = PLAYER_START_POS_Y;
+    player->entity.w = PLAYER_WIDTH;
+    player->entity.h = PLAYER_HEIGHT;
+    player->dx = 0;
+    player->dy = 0;
+    player->self_health = PLAYER_HEALTH;
+    player->home_health = HOME_HEALTH;
+}
+
+void initializeBullet(struct Bullet *bullet)
+{
+    bullet->entity.x = 0;
+    bullet->entity.y = 0;
+    bullet->entity.w = BULLET_WIDTH;
+    bullet->entity.h = BULLET_HEIGHT;
+    bullet->next = NULL;
+    bullet->entity.texture = IMG_LoadTexture(app.renderer, "bullet.png");
+}
+
+void initializeEnemy(struct Enemy *enemy)
+{
+    enemy->health = ENEMY_HEALTH;
+    enemy->next = NULL;
+    enemy->entity.texture = IMG_LoadTexture(app.renderer, "enemy.png");
+    enemy->entity.w = PLAYER_WIDTH;
+    enemy->entity.h = PLAYER_HEIGHT;
+
+    enemy->entity.x = SCREEN_WIDTH - enemy->entity.w;
+    enemy->entity.y = get_spawn_coordinate();
+}
+
+/*
+ * Game Entity position manipulation
+ */
+void updateEntityPosition(struct Entity *entity, int dx, int dy)
+{
+    entity->x += dx;
+    entity->y += dy;
+
+    if (entity->x < 0) entity->x = 0;
+    if (entity->y < 0) entity->y = 0;
+}
+
 void placeEntity(struct Entity *entity)
 {
     SDL_Rect rect;
@@ -150,18 +193,122 @@ void placeEntity(struct Entity *entity)
     SDL_RenderCopy(app.renderer, entity->texture, NULL, &rect);
 }
 
-void placeBulletStage(struct Bullet_Stage *stage)
+void placeBulletStage(struct Bullet_Stage *bullet_stage)
 {
-    for (struct Bullet *bullet = stage->head; bullet != NULL; bullet = bullet->next) {
+    for (struct Bullet *bullet = bullet_stage->head; bullet != NULL; bullet = bullet->next) {
 	placeEntity(&bullet->entity);
     }
 }
 
-void moveBullets(struct Bullet_Stage *stage)
+void placeEnemyStage(struct Enemy_Stage *enemy_stage)
 {
-    for (struct Bullet *bullet = stage->head; bullet != NULL; bullet = bullet->next) {
-	bullet->entity.x += 10;
+    for (struct Enemy *enemy = enemy_stage->head; enemy != NULL; enemy = enemy->next) {
+	placeEntity(&enemy->entity);
+    }
+}
+
+/*
+ * Bullets
+ */
+void handleBulletFiring(struct Player *player, struct Bullet_Stage *bullet_stage)
+{
+    struct Bullet *bullet = malloc(sizeof(struct Bullet));
+
+    initializeBullet(bullet);
+    struct Entity e = player->entity;
+    updateEntityPosition(&bullet->entity, e.x + e.w, e.y + e.h / 2.5);
+
+    if (!bullet_stage->tail) {
+	bullet_stage->head = bullet;
+	bullet_stage->tail = bullet;
+    } else {
+	bullet_stage->tail->next = bullet;
+	bullet_stage->tail = bullet;
+    }
+}
+
+void moveBullets(struct Bullet_Stage *bullet_stage)
+{
+    for (struct Bullet *bullet = bullet_stage->head; bullet != NULL; bullet = bullet->next) {
+	bullet->entity.x += BULLET_SPEED;
 	// TODO: handle screen
+    }
+}
+
+void moveEnemies(struct Enemy_Stage *enemy_stage)
+{
+    for (struct Enemy *enemy = enemy_stage->head; enemy != NULL; enemy = enemy->next) {
+	enemy->entity.x -= ENEMY_SPEED;
+    }
+}
+
+/*
+ * Enemies
+ */
+void spawnEnemies(struct Enemy_Stage *enemy_stage)
+{
+    if (!spawn()) return;
+    struct Enemy *enemy = malloc(sizeof(struct Enemy));
+    initializeEnemy(enemy);
+
+    if (!enemy_stage->tail) {
+	enemy_stage->head = enemy;
+	enemy_stage->tail = enemy;
+    } else {
+	enemy_stage->tail->next = enemy;
+	enemy_stage->tail = enemy;
+    }
+}
+
+void onKeyListener(struct Player *player, struct Bullet_Stage *bullet_stage, SDL_KeyboardEvent *event)
+{
+    if (event->repeat == 0) {
+	int dx = 0;
+	int dy = 0;
+	switch (event->keysym.scancode) {
+	case SDL_SCANCODE_UP:
+	    dy = -(PLAYER_SPEED);
+	    break;
+	case SDL_SCANCODE_DOWN:
+	    dy = PLAYER_SPEED;
+	    break;
+	case SDL_SCANCODE_RIGHT:
+	    dx = PLAYER_SPEED;
+	    break;
+	case SDL_SCANCODE_LEFT:
+	    dx = -(PLAYER_SPEED);
+	    break;
+	case SDL_SCANCODE_LCTRL:
+	    handleBulletFiring(player, bullet_stage);
+	    break;
+	default:
+	    break;
+	}
+
+	player->dx = dx;
+	player->dy = dy;
+    }
+}
+
+void gameListener(struct Player *player, struct Bullet_Stage *bullet_stage)
+{
+    SDL_Event event;
+
+    while (SDL_PollEvent(&event)) {
+	switch (event.type) {
+	case SDL_KEYDOWN:
+	    onKeyListener(player, bullet_stage, &event.key);
+	    break;
+	case SDL_KEYUP:
+	    player->dx = 0;
+	    player->dy = 0;
+	    break;
+	case SDL_QUIT:
+	    exit(0);
+	    break;
+	default:
+	    break;
+	}
     }
 }
 
@@ -183,24 +330,35 @@ int main(void)
 	exit(1);
     }
 
-    struct Entity player;
-    player.texture = IMG_LoadTexture(app.renderer, "aircraft.png");
-    updatePlayer(&player, 0, 0, 75, 75);
+    struct Player player;
+    initializePlayer(&player);
 
-    struct Bullet_Stage stage;
-    memset(&stage, 0, sizeof(struct Bullet_Stage));
+    struct Bullet_Stage bullet_stage;
+    memset(&bullet_stage, 0, sizeof(struct Bullet_Stage));
+
+    struct Enemy_Stage enemy_stage;
+    memset(&enemy_stage, 0, sizeof(struct Enemy_Stage));
 
     SDL_Event event;
     while (1) {
 	prepareScene();
-	playerListener(&player, &stage);
-	moveBullets(&stage);
-	placeEntity(&player);
-	placeBulletStage(&stage);
-	// TODO: clear them as they closer to WIDTH
+	gameListener(&player, &bullet_stage);
+	updateEntityPosition(&player.entity, player.dx, player.dy);
+	moveBullets(&bullet_stage);
+	spawnEnemies(&enemy_stage);
+
+	moveEnemies(&enemy_stage);
+
+	placeEntity(&player.entity);
+	placeBulletStage(&bullet_stage);
+	placeEnemyStage(&enemy_stage);
 	presentScene();
 	SDL_Delay(16);
     }
 
     return 0;
 }
+
+// TODO: Resolve collisions
+// TODO: free bullets as they pass the screen
+// TODO: manage memory leaks
