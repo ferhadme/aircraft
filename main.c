@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 
@@ -9,7 +10,7 @@ struct App
 {
     SDL_Window *window;
     SDL_Renderer *renderer;
-};
+} app;
 
 struct Entity
 {
@@ -18,32 +19,45 @@ struct Entity
     int w;
     int h;
     SDL_Texture *texture;
-    int visibility;
 };
 
-void updatePlayer(struct Entity *player, int x, int y, int w, int h, int visibility)
+struct Bullet
+{
+    struct Entity entity;
+    struct Bullet *next;
+};
+
+struct Bullet_Stage
+{
+    struct Bullet *head;
+    struct Bullet *tail;
+};
+
+void updatePlayer(struct Entity *player, int x, int y, int w, int h)
 {
     player->x = x;
     player->y = y;
     player->w = w;
     player->h = h;
-    player->visibility = visibility;
 }
 
-void handleBulletFiring(struct Entity *player, struct Entity *bullet)
+void handleBulletFiring(struct Entity *player, struct Bullet_Stage *stage)
 {
-    bullet->visibility = 1;
-    bullet->x = player->x + player->w;
-    bullet->y = player->y + player->h / 2.5;
+    struct Bullet *bullet = malloc(sizeof(struct Bullet));
+    bullet->next = NULL;
+    bullet->entity.texture = IMG_LoadTexture(app.renderer, "bullet.png");
+    updatePlayer(&bullet->entity, player->x + player->w, player->y + player->h / 2.5, 25, 25);
+
+    if (!stage->tail) {
+	stage->head = bullet;
+	stage->tail = bullet;
+    } else {
+	stage->tail->next = bullet;
+	stage->tail = bullet;
+    }
 }
 
-void handleBulletMove(struct Entity *bullet)
-{
-    if (bullet->x >= SCREEN_WIDTH) bullet->visibility = 0;
-    bullet->x += 10;
-}
-
-void updateCoordinates(struct Entity *player, struct Entity *bullet, SDL_KeyboardEvent *event)
+void updateCoordinates(struct Entity *player, struct Bullet_Stage *stage, SDL_KeyboardEvent *event)
 {
     if (event->repeat == 0) {
 	switch (event->keysym.scancode) {
@@ -59,9 +73,8 @@ void updateCoordinates(struct Entity *player, struct Entity *bullet, SDL_Keyboar
 	case SDL_SCANCODE_LEFT:
 	    player->x -= 10;
 	    break;
-	case SDL_SCANCODE_RETURN:
-	    printf("L Ctrl called\n");
-	    handleBulletFiring(player, bullet);
+	case SDL_SCANCODE_LCTRL:
+	    handleBulletFiring(player, stage);
 	    break;
 	default:
 	    break;
@@ -71,25 +84,25 @@ void updateCoordinates(struct Entity *player, struct Entity *bullet, SDL_Keyboar
     }
 }
 
-void prepareScene(struct App *app)
+void prepareScene()
 {
-    SDL_SetRenderDrawColor(app->renderer, 20, 20, 20, 20);
-    SDL_RenderClear(app->renderer);
+    SDL_SetRenderDrawColor(app.renderer, 20, 20, 20, 20);
+    SDL_RenderClear(app.renderer);
 }
 
-void presentScene(struct App *app)
+void presentScene()
 {
-    SDL_RenderPresent(app->renderer);
+    SDL_RenderPresent(app.renderer);
 }
 
-void playerListener(struct Entity *player, struct Entity *bullet)
+void playerListener(struct Entity *player, struct Bullet_Stage *stage)
 {
     SDL_Event event;
 
     while (SDL_PollEvent(&event)) {
 	switch (event.type) {
 	case SDL_KEYUP:
-	    updateCoordinates(player, bullet, &event.key);
+	    updateCoordinates(player, stage, &event.key);
 	    break;
 	case SDL_QUIT:
 	    exit(0);
@@ -126,22 +139,34 @@ SDL_Renderer *initialize_renderer(SDL_Window *window)
     return renderer;
 }
 
-void placeRectangle(struct App *app, struct Entity *entity)
+void placeEntity(struct Entity *entity)
 {
-    if (!entity->visibility) return;
     SDL_Rect rect;
     rect.x = entity->x;
     rect.y = entity->y;
     SDL_QueryTexture(entity->texture, NULL, NULL, &rect.w, &rect.h);
     rect.w = entity->w;
     rect.h = entity->h;
-    SDL_RenderCopy(app->renderer, entity->texture, NULL, &rect);
+    SDL_RenderCopy(app.renderer, entity->texture, NULL, &rect);
+}
+
+void placeBulletStage(struct Bullet_Stage *stage)
+{
+    for (struct Bullet *bullet = stage->head; bullet != NULL; bullet = bullet->next) {
+	placeEntity(&bullet->entity);
+    }
+}
+
+void moveBullets(struct Bullet_Stage *stage)
+{
+    for (struct Bullet *bullet = stage->head; bullet != NULL; bullet = bullet->next) {
+	bullet->entity.x += 10;
+	// TODO: handle screen
+    }
 }
 
 int main(void)
 {
-    struct App app;
-
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
 	printf("Couldn't initialize SDL system: %s\n", SDL_GetError());
 	exit(1);
@@ -160,20 +185,20 @@ int main(void)
 
     struct Entity player;
     player.texture = IMG_LoadTexture(app.renderer, "aircraft.png");
-    updatePlayer(&player, 0, 0, 75, 75, 1);
+    updatePlayer(&player, 0, 0, 75, 75);
 
-    struct Entity bullet;
-    bullet.texture = IMG_LoadTexture(app.renderer, "bullet.png");
-    updatePlayer(&bullet, 0, 0, 25, 25, 0);
+    struct Bullet_Stage stage;
+    memset(&stage, 0, sizeof(struct Bullet_Stage));
 
     SDL_Event event;
     while (1) {
-	prepareScene(&app);
-	playerListener(&player, &bullet);
-	handleBulletMove(&bullet);
-	placeRectangle(&app, &player);
-	placeRectangle(&app, &bullet);
-	presentScene(&app);
+	prepareScene();
+	playerListener(&player, &stage);
+	moveBullets(&stage);
+	placeEntity(&player);
+	placeBulletStage(&stage);
+	// TODO: clear them as they closer to WIDTH
+	presentScene();
 	SDL_Delay(16);
     }
 
