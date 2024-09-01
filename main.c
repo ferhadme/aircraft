@@ -202,9 +202,22 @@ void placeBulletStage(struct Bullet_Stage *bullet_stage)
 
 void placeEnemyStage(struct Enemy_Stage *enemy_stage)
 {
-    for (struct Enemy *enemy = enemy_stage->head; enemy != NULL; enemy = enemy->next) {
+    for (struct Enemy *enemy = enemy_stage->head; enemy; enemy = enemy->next) {
 	placeEntity(&enemy->entity);
     }
+}
+
+/*
+ * Collisions
+ */
+int checkForCollision(struct Bullet *bullet, struct Enemy_Stage *enemy_stage)
+{
+    struct Entity e = bullet->entity;
+    for (struct Enemy *enemy = enemy_stage->head; enemy; enemy = enemy->next) {
+	// TODO: Calculate if collision happens
+    }
+
+    return 0;
 }
 
 /*
@@ -227,17 +240,25 @@ void handleBulletFiring(struct Player *player, struct Bullet_Stage *bullet_stage
     }
 }
 
-void moveBullets(struct Bullet_Stage *bullet_stage)
+void moveBullets(struct Bullet_Stage *bullet_stage, struct Enemy_Stage *enemy_stage)
 {
-    for (struct Bullet *bullet = bullet_stage->head; bullet != NULL; bullet = bullet->next) {
+    struct Bullet *head = bullet_stage->head, *prev = NULL;
+    if (head && head->entity.x > SCREEN_WIDTH) {
+	bullet_stage->head = head->next;
+	if (!bullet_stage->head) {
+	    bullet_stage->tail = NULL;
+	}
+	free(head);
+    }
+
+    for (struct Bullet *bullet = bullet_stage->head; bullet; bullet = bullet->next) {
 	bullet->entity.x += BULLET_SPEED;
-	// TODO: handle screen
     }
 }
 
 void moveEnemies(struct Enemy_Stage *enemy_stage)
 {
-    for (struct Enemy *enemy = enemy_stage->head; enemy != NULL; enemy = enemy->next) {
+    for (struct Enemy *enemy = enemy_stage->head; enemy; enemy = enemy->next) {
 	enemy->entity.x -= ENEMY_SPEED;
     }
 }
@@ -344,7 +365,7 @@ int main(void)
 	prepareScene();
 	gameListener(&player, &bullet_stage);
 	updateEntityPosition(&player.entity, player.dx, player.dy);
-	moveBullets(&bullet_stage);
+	moveBullets(&bullet_stage, &enemy_stage);
 	spawnEnemies(&enemy_stage);
 
 	moveEnemies(&enemy_stage);
@@ -359,6 +380,9 @@ int main(void)
     return 0;
 }
 
-// TODO: Resolve collisions
+// TODO: Resolve collisions of bullets and aircrafts
+// TODO: Add enemy aircrafts bullets
+// TODO: Add audio
+// TODO: Add score table
 // TODO: free bullets as they pass the screen
 // TODO: manage memory leaks
