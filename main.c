@@ -226,8 +226,15 @@ void removeCollidedObj(struct Obj_Stage *obj_stage, struct Obj_Node *collided)
  */
 int checkForCollision(struct Entity *e1, struct Entity *e2)
 {
-    // e1, e2
-    
+    // e1.x+e1.w > e2.x
+    // e2.x+e2.w > e1.x
+    // e1.y+e1.h > e2.y
+    // e2.y+e2.h > e1.y
+
+    return e1->x + e1->w > e2->x &&
+	e2->x + e2->w > e1->x &&
+	e1->y + e1->h > e2->y &&
+	e2->y + e2->h > e1->y;
 }
 
 /*
@@ -236,7 +243,7 @@ int checkForCollision(struct Entity *e1, struct Entity *e2)
 int removeCollisions(struct Obj_Node *bullet, struct Obj_Stage *enemy_stage)
 {
     for (struct Obj_Node *enemy = enemy_stage->head; enemy; enemy = enemy->next) {
-	if (checkForCollision(bullet->entity, enemy->entity)) {
+	if (checkForCollision(&bullet->entity, &enemy->entity)) {
 	    removeCollidedObj(enemy_stage, enemy);
 	    return 1;
 	}
@@ -414,9 +421,9 @@ int main(void)
     return 0;
 }
 
+// TODO: Resolve Segmentation fault in collisions
 // TODO: Resolve collisions of bullets and aircrafts
 // TODO: Add enemy aircrafts bullets
 // TODO: Add audio
 // TODO: Add score table
-// TODO: free bullets as they pass the screen
 // TODO: manage memory leaks
