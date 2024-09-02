@@ -24,11 +24,16 @@
 #define PLAYER_SPEED 5
 #define BULLET_SPEED 8
 #define ENEMY_SPEED 0.1
+// #define ENEMY_SPEED 20
+
+#define BULLET_SCREEN_PASS_COND(head) ((head) && (head->entity.x > SCREEN_WIDTH))
+#define ENEMY_SCREEN_PASS_COND(head) ((head) && (head->entity.x + head->entity.w < 0))
 
 struct App
 {
     SDL_Window *window;
     SDL_Renderer *renderer;
+    int termination;
 } app;
 
 struct Entity
@@ -49,29 +54,17 @@ struct Player
     int home_health;
 };
 
-struct Enemy
+struct Obj_Node
 {
     struct Entity entity;
-    int health;
-    struct Enemy *next;
+    struct Obj_Node *next;
+    struct Obj_Node *prev;
 };
 
-struct Bullet
+struct Obj_Stage
 {
-    struct Entity entity;
-    struct Bullet *next;
-};
-
-struct Bullet_Stage
-{
-    struct Bullet *head;
-    struct Bullet *tail;
-};
-
-struct Enemy_Stage
-{
-    struct Enemy *head;
-    struct Enemy *tail;
+    struct Obj_Node *head;
+    struct Obj_Node *tail;
 };
 
 /*
@@ -127,9 +120,9 @@ int spawn()
     return 1;
 }
 
-int get_spawn_coordinate()
+int get_spawn_coordinate(int height)
 {
-    return rand() % SCREEN_HEIGHT;
+    return rand() % (SCREEN_HEIGHT - height);
 }
 
 /*
@@ -148,26 +141,26 @@ void initializePlayer(struct Player *player)
     player->home_health = HOME_HEALTH;
 }
 
-void initializeBullet(struct Bullet *bullet)
+void initializeBullet(struct Obj_Node *bullet)
 {
     bullet->entity.x = 0;
     bullet->entity.y = 0;
     bullet->entity.w = BULLET_WIDTH;
     bullet->entity.h = BULLET_HEIGHT;
+    bullet->prev = NULL;
     bullet->next = NULL;
     bullet->entity.texture = IMG_LoadTexture(app.renderer, "bullet.png");
 }
 
-void initializeEnemy(struct Enemy *enemy)
+void initializeEnemy(struct Obj_Node *enemy)
 {
-    enemy->health = ENEMY_HEALTH;
+    enemy->prev = NULL;
     enemy->next = NULL;
     enemy->entity.texture = IMG_LoadTexture(app.renderer, "enemy.png");
     enemy->entity.w = PLAYER_WIDTH;
     enemy->entity.h = PLAYER_HEIGHT;
-
     enemy->entity.x = SCREEN_WIDTH - enemy->entity.w;
-    enemy->entity.y = get_spawn_coordinate();
+    enemy->entity.y = get_spawn_coordinate(enemy->entity.h);
 }
 
 /*
@@ -193,16 +186,16 @@ void placeEntity(struct Entity *entity)
     SDL_RenderCopy(app.renderer, entity->texture, NULL, &rect);
 }
 
-void placeBulletStage(struct Bullet_Stage *bullet_stage)
+void placeBulletStage(struct Obj_Stage *bullet_stage)
 {
-    for (struct Bullet *bullet = bullet_stage->head; bullet != NULL; bullet = bullet->next) {
+    for (struct Obj_Node *bullet = bullet_stage->head; bullet != NULL; bullet = bullet->next) {
 	placeEntity(&bullet->entity);
     }
 }
 
-void placeEnemyStage(struct Enemy_Stage *enemy_stage)
+void placeEnemyStage(struct Obj_Stage *enemy_stage)
 {
-    for (struct Enemy *enemy = enemy_stage->head; enemy; enemy = enemy->next) {
+    for (struct Obj_Node *enemy = enemy_stage->head; enemy; enemy = enemy->next) {
 	placeEntity(&enemy->entity);
     }
 }
@@ -210,55 +203,101 @@ void placeEnemyStage(struct Enemy_Stage *enemy_stage)
 /*
  * Collisions
  */
-int checkForCollision(struct Bullet *bullet, struct Enemy_Stage *enemy_stage)
+void removeCollidedObj(struct Obj_Stage *obj_stage, struct Obj_Node *collided)
 {
-    struct Entity e = bullet->entity;
-    for (struct Enemy *enemy = enemy_stage->head; enemy; enemy = enemy->next) {
-	// TODO: Calculate if collision happens
+    struct Obj_Node *head = obj_stage->head;
+    struct Obj_Node *tail = obj_stage->tail;
+    if (collided == head) {
+	if (collided == obj_stage->tail) {
+	    obj_stage->tail = NULL;
+	}
+	obj_stage->head = head->next;
+    } else if (collided == tail) {
+	tail->prev->next = NULL;
+	obj_stage->tail = collided->prev;
+    } else {
+	collided->prev->next = collided->next;
+    }
+    free(collided);
+}
+
+/*
+ * Checks if two objects collided with each other
+ */
+int checkForCollision(struct Entity *e1, struct Entity *e2)
+{
+    // e1, e2
+    
+}
+
+/*
+ * e.x
+ */
+int removeCollisions(struct Obj_Node *bullet, struct Obj_Stage *enemy_stage)
+{
+    for (struct Obj_Node *enemy = enemy_stage->head; enemy; enemy = enemy->next) {
+	if (checkForCollision(bullet->entity, enemy->entity)) {
+	    removeCollidedObj(enemy_stage, enemy);
+	    return 1;
+	}
     }
 
     return 0;
 }
 
+void addNodeToObjStage(struct Obj_Stage *obj_stage, struct Obj_Node *obj_node)
+{
+    if (!obj_stage->tail) {
+	obj_stage->head = obj_node;
+	obj_stage->tail = obj_node;
+    } else {
+	obj_stage->tail->next = obj_node;
+	obj_node->prev = obj_stage->tail;
+	obj_stage->tail = obj_node;
+    }
+}
+
 /*
  * Bullets
  */
-void handleBulletFiring(struct Player *player, struct Bullet_Stage *bullet_stage)
+void handleBulletFiring(struct Player *player, struct Obj_Stage *bullet_stage)
 {
-    struct Bullet *bullet = malloc(sizeof(struct Bullet));
+    struct Obj_Node *bullet = malloc(sizeof(struct Obj_Node));
 
     initializeBullet(bullet);
     struct Entity e = player->entity;
     updateEntityPosition(&bullet->entity, e.x + e.w, e.y + e.h / 2.5);
-
-    if (!bullet_stage->tail) {
-	bullet_stage->head = bullet;
-	bullet_stage->tail = bullet;
-    } else {
-	bullet_stage->tail->next = bullet;
-	bullet_stage->tail = bullet;
-    }
+    addNodeToObjStage(bullet_stage, bullet);
 }
 
-void moveBullets(struct Bullet_Stage *bullet_stage, struct Enemy_Stage *enemy_stage)
+void removeScreenPassedObj(struct Obj_Stage *obj_stage, int pass_width_cond)
 {
-    struct Bullet *head = bullet_stage->head, *prev = NULL;
-    if (head && head->entity.x > SCREEN_WIDTH) {
-	bullet_stage->head = head->next;
-	if (!bullet_stage->head) {
-	    bullet_stage->tail = NULL;
+    struct Obj_Node *head = obj_stage->head;
+    if (pass_width_cond) {
+	obj_stage->head = head->next;
+	if (!obj_stage->head) {
+	    obj_stage->tail = NULL;
 	}
 	free(head);
     }
+}
 
-    for (struct Bullet *bullet = bullet_stage->head; bullet; bullet = bullet->next) {
+void moveBullets(struct Obj_Stage *bullet_stage, struct Obj_Stage *enemy_stage)
+{
+    removeScreenPassedObj(bullet_stage, BULLET_SCREEN_PASS_COND(bullet_stage->head));
+    for (struct Obj_Node *bullet = bullet_stage->head; bullet; bullet = bullet->next) {
 	bullet->entity.x += BULLET_SPEED;
+	int collision = removeCollisions(bullet, enemy_stage);
+	if (collision) {
+	    removeCollidedObj(bullet_stage, bullet);
+	}
     }
 }
 
-void moveEnemies(struct Enemy_Stage *enemy_stage)
+void moveEnemies(struct Obj_Stage *enemy_stage)
 {
-    for (struct Enemy *enemy = enemy_stage->head; enemy; enemy = enemy->next) {
+    removeScreenPassedObj(enemy_stage, ENEMY_SCREEN_PASS_COND(enemy_stage->head));
+    for (struct Obj_Node *enemy = enemy_stage->head; enemy; enemy = enemy->next) {
 	enemy->entity.x -= ENEMY_SPEED;
     }
 }
@@ -266,22 +305,16 @@ void moveEnemies(struct Enemy_Stage *enemy_stage)
 /*
  * Enemies
  */
-void spawnEnemies(struct Enemy_Stage *enemy_stage)
+void spawnEnemies(struct Obj_Stage *enemy_stage)
 {
     if (!spawn()) return;
-    struct Enemy *enemy = malloc(sizeof(struct Enemy));
+    struct Obj_Node *enemy = malloc(sizeof(struct Obj_Node));
     initializeEnemy(enemy);
 
-    if (!enemy_stage->tail) {
-	enemy_stage->head = enemy;
-	enemy_stage->tail = enemy;
-    } else {
-	enemy_stage->tail->next = enemy;
-	enemy_stage->tail = enemy;
-    }
+    addNodeToObjStage(enemy_stage, enemy);
 }
 
-void onKeyListener(struct Player *player, struct Bullet_Stage *bullet_stage, SDL_KeyboardEvent *event)
+void onKeyListener(struct Player *player, struct Obj_Stage *bullet_stage, SDL_KeyboardEvent *event)
 {
     if (event->repeat == 0) {
 	int dx = 0;
@@ -311,7 +344,7 @@ void onKeyListener(struct Player *player, struct Bullet_Stage *bullet_stage, SDL
     }
 }
 
-void gameListener(struct Player *player, struct Bullet_Stage *bullet_stage)
+void gameListener(struct Player *player, struct Obj_Stage *bullet_stage)
 {
     SDL_Event event;
 
@@ -325,7 +358,7 @@ void gameListener(struct Player *player, struct Bullet_Stage *bullet_stage)
 	    player->dy = 0;
 	    break;
 	case SDL_QUIT:
-	    exit(0);
+	    app.termination = 1;
 	    break;
 	default:
 	    break;
@@ -340,6 +373,7 @@ int main(void)
 	exit(1);
     }
 
+    app.termination = 0;
     app.window = initialize_window();
 
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
@@ -354,14 +388,14 @@ int main(void)
     struct Player player;
     initializePlayer(&player);
 
-    struct Bullet_Stage bullet_stage;
-    memset(&bullet_stage, 0, sizeof(struct Bullet_Stage));
+    struct Obj_Stage bullet_stage;
+    memset(&bullet_stage, 0, sizeof(struct Obj_Stage));
 
-    struct Enemy_Stage enemy_stage;
-    memset(&enemy_stage, 0, sizeof(struct Enemy_Stage));
+    struct Obj_Stage enemy_stage;
+    memset(&enemy_stage, 0, sizeof(struct Obj_Stage));
 
     SDL_Event event;
-    while (1) {
+    while (!app.termination) {
 	prepareScene();
 	gameListener(&player, &bullet_stage);
 	updateEntityPosition(&player.entity, player.dx, player.dy);
