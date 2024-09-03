@@ -432,6 +432,8 @@ int main(void)
 
 // TODO: Add enemy aircrafts bullets
 // TODO: Player protects wall from enemy (will affect to score of player)
+// TODO: Make window dynamically resizable
 // TODO: Add audio
 // TODO: Add score table
+// TODO: Replace readme image with gif
 // TODO: manage memory leaks
