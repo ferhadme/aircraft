@@ -29,6 +29,8 @@
 #define BULLET_SCREEN_PASS_COND(head) ((head) && (head->entity.x > SCREEN_WIDTH))
 #define ENEMY_SCREEN_PASS_COND(head) ((head) && (head->entity.x + head->entity.w < 0))
 
+int counter = 0;
+
 struct App
 {
     SDL_Window *window;
@@ -203,19 +205,20 @@ void placeEnemyStage(struct Obj_Stage *enemy_stage)
 /*
  * Collisions
  */
-void removeCollidedObj(struct Obj_Stage *obj_stage, struct Obj_Node *collided)
+struct Obj_Node *removeCollidedObj(struct Obj_Stage *obj_stage, struct Obj_Node *collided)
 {
     struct Obj_Node *head = obj_stage->head;
     struct Obj_Node *tail = obj_stage->tail;
     if (collided == head) {
-	if (collided == obj_stage->tail) {
+	if (collided == tail) {
 	    obj_stage->tail = NULL;
 	}
 	obj_stage->head = head->next;
     } else if (collided == tail) {
 	tail->prev->next = NULL;
-	obj_stage->tail = collided->prev;
+	obj_stage->tail = tail->prev;
     } else {
+	collided->next->prev = collided->prev;
 	collided->prev->next = collided->next;
     }
     free(collided);
@@ -237,9 +240,6 @@ int checkForCollision(struct Entity *e1, struct Entity *e2)
 	e2->y + e2->h > e1->y;
 }
 
-/*
- * e.x
- */
 int removeCollisions(struct Obj_Node *bullet, struct Obj_Stage *enemy_stage)
 {
     for (struct Obj_Node *enemy = enemy_stage->head; enemy; enemy = enemy->next) {
@@ -248,7 +248,6 @@ int removeCollisions(struct Obj_Node *bullet, struct Obj_Stage *enemy_stage)
 	    return 1;
 	}
     }
-
     return 0;
 }
 
@@ -292,11 +291,16 @@ void removeScreenPassedObj(struct Obj_Stage *obj_stage, int pass_width_cond)
 void moveBullets(struct Obj_Stage *bullet_stage, struct Obj_Stage *enemy_stage)
 {
     removeScreenPassedObj(bullet_stage, BULLET_SCREEN_PASS_COND(bullet_stage->head));
-    for (struct Obj_Node *bullet = bullet_stage->head; bullet; bullet = bullet->next) {
+    struct Obj_Node *bullet = bullet_stage->head;
+    while (bullet) {
 	bullet->entity.x += BULLET_SPEED;
 	int collision = removeCollisions(bullet, enemy_stage);
 	if (collision) {
+	    struct Obj_Node *next = bullet->next;
 	    removeCollidedObj(bullet_stage, bullet);
+	    bullet = next;
+	} else {
+	    bullet = bullet->next;
 	}
     }
 }
@@ -406,9 +410,9 @@ int main(void)
 	prepareScene();
 	gameListener(&player, &bullet_stage);
 	updateEntityPosition(&player.entity, player.dx, player.dy);
-	moveBullets(&bullet_stage, &enemy_stage);
 	spawnEnemies(&enemy_stage);
 
+	moveBullets(&bullet_stage, &enemy_stage);
 	moveEnemies(&enemy_stage);
 
 	placeEntity(&player.entity);
