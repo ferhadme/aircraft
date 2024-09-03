@@ -4,6 +4,9 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 
+/*
+ * Game settings
+ */
 #define SCREEN_WIDTH 1400
 #define SCREEN_HEIGHT 900
 
@@ -24,12 +27,18 @@
 #define PLAYER_SPEED 5
 #define BULLET_SPEED 8
 #define ENEMY_SPEED 0.1
-// #define ENEMY_SPEED 20
 
 #define BULLET_SCREEN_PASS_COND(head) ((head) && (head->entity.x > SCREEN_WIDTH))
 #define ENEMY_SCREEN_PASS_COND(head) ((head) && (head->entity.x + head->entity.w < 0))
 
-int counter = 0;
+/*
+ * Structs and Enums
+ */
+enum BULLET_SIDE
+{
+    PLAYER,
+    ENEMY
+};
 
 struct App
 {
@@ -203,7 +212,7 @@ void placeEnemyStage(struct Obj_Stage *enemy_stage)
 }
 
 /*
- * Collisions
+ * Object collisions
  */
 struct Obj_Node *removeCollidedObj(struct Obj_Stage *obj_stage, struct Obj_Node *collided)
 {
@@ -224,16 +233,8 @@ struct Obj_Node *removeCollidedObj(struct Obj_Stage *obj_stage, struct Obj_Node 
     free(collided);
 }
 
-/*
- * Checks if two objects collided with each other
- */
 int checkForCollision(struct Entity *e1, struct Entity *e2)
 {
-    // e1.x+e1.w > e2.x
-    // e2.x+e2.w > e1.x
-    // e1.y+e1.h > e2.y
-    // e2.y+e2.h > e1.y
-
     return e1->x + e1->w > e2->x &&
 	e2->x + e2->w > e1->x &&
 	e1->y + e1->h > e2->y &&
@@ -263,6 +264,18 @@ void addNodeToObjStage(struct Obj_Stage *obj_stage, struct Obj_Node *obj_node)
     }
 }
 
+void removeScreenPassedObj(struct Obj_Stage *obj_stage, int pass_width_cond)
+{
+    struct Obj_Node *head = obj_stage->head;
+    if (pass_width_cond) {
+	obj_stage->head = head->next;
+	if (!obj_stage->head) {
+	    obj_stage->tail = NULL;
+	}
+	free(head);
+    }
+}
+
 /*
  * Bullets
  */
@@ -276,22 +289,11 @@ void handleBulletFiring(struct Player *player, struct Obj_Stage *bullet_stage)
     addNodeToObjStage(bullet_stage, bullet);
 }
 
-void removeScreenPassedObj(struct Obj_Stage *obj_stage, int pass_width_cond)
-{
-    struct Obj_Node *head = obj_stage->head;
-    if (pass_width_cond) {
-	obj_stage->head = head->next;
-	if (!obj_stage->head) {
-	    obj_stage->tail = NULL;
-	}
-	free(head);
-    }
-}
-
 void moveBullets(struct Obj_Stage *bullet_stage, struct Obj_Stage *enemy_stage)
 {
     removeScreenPassedObj(bullet_stage, BULLET_SCREEN_PASS_COND(bullet_stage->head));
     struct Obj_Node *bullet = bullet_stage->head;
+
     while (bullet) {
 	bullet->entity.x += BULLET_SPEED;
 	int collision = removeCollisions(bullet, enemy_stage);
@@ -302,14 +304,6 @@ void moveBullets(struct Obj_Stage *bullet_stage, struct Obj_Stage *enemy_stage)
 	} else {
 	    bullet = bullet->next;
 	}
-    }
-}
-
-void moveEnemies(struct Obj_Stage *enemy_stage)
-{
-    removeScreenPassedObj(enemy_stage, ENEMY_SCREEN_PASS_COND(enemy_stage->head));
-    for (struct Obj_Node *enemy = enemy_stage->head; enemy; enemy = enemy->next) {
-	enemy->entity.x -= ENEMY_SPEED;
     }
 }
 
@@ -325,6 +319,17 @@ void spawnEnemies(struct Obj_Stage *enemy_stage)
     addNodeToObjStage(enemy_stage, enemy);
 }
 
+void moveEnemies(struct Obj_Stage *enemy_stage)
+{
+    removeScreenPassedObj(enemy_stage, ENEMY_SCREEN_PASS_COND(enemy_stage->head));
+    for (struct Obj_Node *enemy = enemy_stage->head; enemy; enemy = enemy->next) {
+	enemy->entity.x -= ENEMY_SPEED;
+    }
+}
+
+/*
+ * Event loop listeners
+ */
 void onKeyListener(struct Player *player, struct Obj_Stage *bullet_stage, SDL_KeyboardEvent *event)
 {
     if (event->repeat == 0) {
@@ -425,9 +430,8 @@ int main(void)
     return 0;
 }
 
-// TODO: Resolve Segmentation fault in collisions
-// TODO: Resolve collisions of bullets and aircrafts
 // TODO: Add enemy aircrafts bullets
+// TODO: Player protects wall from enemy (will affect to score of player)
 // TODO: Add audio
 // TODO: Add score table
 // TODO: manage memory leaks
