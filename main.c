@@ -21,11 +21,12 @@
 #define PLAYER_HEALTH 100
 #define HOME_HEALTH 300
 #define ENEMY_HEALTH 20
-#define PLAYER_BULLET_POW 10
-#define ENEMY_BULLET_POW 10
+#define PLAYER_BULLET_DAMAGE 10
+#define ENEMY_BULLET_DAMAGE 10
 
 #define PLAYER_SPEED 5
 #define BULLET_SPEED 8
+#define ENEMY_BULLET_SPEED 3
 #define ENEMY_SPEED 0.1
 
 #define ENEMY_SPAWN_PROBABILITY 10
@@ -322,13 +323,13 @@ void removeScreenPassedObj(struct Obj_Node **head, struct Obj_Node **tail,
 /*
  * Bullets
  */
-void handleBulletFiring(struct Player *player, struct Bullet_Stage *bullet_stage)
+void handleBulletFiring(struct Entity *from, struct Bullet_Stage *bullet_stage)
 {
     struct Bullet *bullet = malloc(sizeof(struct Bullet));
 
     initializeBullet(bullet);
-    struct Entity e = player->entity;
-    updateEntityPosition(&bullet->entity, e.x + e.w, e.y + e.h / 2.5);
+
+    updateEntityPosition(&bullet->entity, from->x + from->w, from->y + from->h / 2.5);
     addNodeToObjStage((struct Obj_Node **) &bullet_stage->head,
 		      (struct Obj_Node **) &bullet_stage->tail,
 		      &bullet->node);
@@ -359,15 +360,39 @@ void moveBullets(struct Bullet_Stage *bullet_stage, struct Enemy_Stage *enemy_st
 void spawnEnemyBullets(struct Enemy_Stage *enemy_stage,
 		       struct Bullet_Stage *enemy_bullet_stage)
 {
-    // TODO: Implement
-    return;
+    for (struct Enemy *enemy = enemy_stage->head; enemy; enemy = getNextEnemy(enemy)) {
+	if (spawn(ENEMY_BULLET_SPAWN_PROBABILITY)) {
+	    handleBulletFiring(&enemy->entity, enemy_bullet_stage);
+	}
+    }
 }
 
 void moveEnemyBullets(struct Bullet_Stage *enemy_bullet_stage,
 		      struct Player *player)
 {
-    // TODO: Implement
-    return;
+    struct Bullet *bullet = enemy_bullet_stage->head;
+    while (bullet) {
+	bullet->entity.x -= BULLET_SPEED;
+
+	int collisionWithPlayer = checkForCollision(&bullet->entity, &player->entity);
+	int collisionWithHome = bullet->entity.x == 0;
+
+	if (collisionWithPlayer || collisionWithHome) {
+	    struct Bullet *next = getNextBullet(bullet);
+	    removeCollidedObjNode((struct Obj_Node **) enemy_bullet_stage->head,
+				  (struct Obj_Node **) enemy_bullet_stage->tail,
+				  &bullet->node);
+	    bullet = next;
+
+	    if (collisionWithPlayer) {
+		player->self_health -= ENEMY_BULLET_DAMAGE;
+	    } else {
+		player->home_health -= ENEMY_BULLET_DAMAGE;		
+	    }
+	} else {
+	    bullet = getNextBullet(bullet);
+	}
+    }
 }
 
 /*
@@ -419,7 +444,7 @@ void onKeyListener(struct Player *player, struct Bullet_Stage *bullet_stage,
 	    dx = -(PLAYER_SPEED);
 	    break;
 	case SDL_SCANCODE_LCTRL:
-	    handleBulletFiring(player, bullet_stage);
+	    handleBulletFiring(&player->entity, bullet_stage);
 	    break;
 	default:
 	    break;
@@ -506,7 +531,6 @@ int main(void)
     return 0;
 }
 
-// TODO: Add enemy aircrafts bullets
 // TODO: Player protects wall from enemy (will affect to score of player)
 // TODO: Make window dynamically resizable
 // TODO: Add audio
