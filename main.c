@@ -108,7 +108,7 @@ struct Enemy_Stage
 SDL_Window *initialize_window(void)
 {
     int windowFlags = 0;
-    SDL_Window *window = SDL_CreateWindow("Shooter",
+    SDL_Window *window = SDL_CreateWindow("2D Aircraft Game",
 					  SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
 					  SCREEN_WIDTH, SCREEN_HEIGHT, windowFlags);
 
@@ -511,8 +511,10 @@ int main(void)
     SDL_Event event;
     while (!app.termination) {
 	prepareScene();
+
 	gameListener(&player, &player_bullet_stage);
 	updateEntityPosition(&player.entity, player.dx, player.dy);
+
 	spawnEnemies(&enemy_stage);
 	spawnEnemyBullets(&enemy_stage, &enemy_bullet_stage);
 
@@ -524,6 +526,7 @@ int main(void)
 	placeBulletStage(&player_bullet_stage);
 	placeBulletStage(&enemy_bullet_stage);
 	placeEnemyStage(&enemy_stage);
+
 	presentScene();
 	SDL_Delay(16);
     }
@@ -532,6 +535,7 @@ int main(void)
 }
 
 // TODO: Player protects wall from enemy (will affect to score of player)
+// TODO: Handle better spawn strategy for enemy aircrafts
 // TODO: Make window dynamically resizable
 // TODO: Add audio
 // TODO: Add score table
