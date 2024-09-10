@@ -9,9 +9,10 @@
  */
 #define SCREEN_WIDTH 1400
 #define SCREEN_HEIGHT 900
+#define SCREEN_Y_START_POS 50
 
 #define PLAYER_START_POS_X 0
-#define PLAYER_START_POS_Y 0
+#define PLAYER_START_POS_Y SCREEN_Y_START_POS
 
 #define PLAYER_WIDTH 75
 #define PLAYER_HEIGHT 75
@@ -27,15 +28,18 @@
 #define PLAYER_SPEED 5
 #define BULLET_SPEED 8
 #define ENEMY_BULLET_SPEED 3
-#define ENEMY_SPEED 0.1
+#define ENEMY_SPEED 1
 
 #define ENEMY_SPAWN_PROBABILITY 10
 #define ENEMY_BULLET_SPAWN_PROBABILITY 3
 
-#define END_OF_SCREEN_PASS_COND(obj) \
+#define END_OF_SCREEN_PASS_COND(obj)		\
     ((obj) && (obj->entity.x > SCREEN_WIDTH))
-#define BEGINNING_OF_SCREEN_PASS_COND(obj) \
-    ((obj) && (obj->entity.x + obj->entity.w < 0))
+
+#define BEGINNING_OF_SCREEN_PASS_COND(obj)	\
+    ((obj) && (obj->entity.x < 0))
+
+#define SDL_INIT_ERR_TEMPLATE "Couldn't initialize %s: %s\n"
 
 /*
  * Structs
@@ -98,6 +102,14 @@ struct Enemy_Stage
 /*
  * SDL Initializers
  */
+void SDL_SafeInitialize(int initializer, const char *component)
+{
+    if (!initializer) {
+	fprintf(stderr, SDL_INIT_ERR_TEMPLATE, component, SDL_GetError());
+	exit(1);
+    }
+}
+
 SDL_Window *initialize_window(void)
 {
     int windowFlags = 0;
@@ -106,7 +118,7 @@ SDL_Window *initialize_window(void)
 					  SCREEN_WIDTH, SCREEN_HEIGHT, windowFlags);
 
     if (!window) {
-	printf("Couldn't initialize window: %s\n", SDL_GetError());
+	fprintf(stderr, SDL_INIT_ERR_TEMPLATE, "window", SDL_GetError());
 	exit(1);
     }
 
@@ -117,9 +129,11 @@ SDL_Renderer *initialize_renderer(SDL_Window *window)
 {
     int rendererFlags = SDL_RENDERER_ACCELERATED;
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, rendererFlags);
+
     if (!renderer) {
-	printf("Couldn't initialize renderer: %s\n", SDL_GetError());
+	fprintf(stderr, SDL_INIT_ERR_TEMPLATE, "renderer", SDL_GetError());
 	exit(1);
+
     }
 
     return renderer;
@@ -194,7 +208,7 @@ void initializePlayer(struct Player *player)
 void initializeBullet(struct Bullet *bullet)
 {
     bullet->entity.x = 0;
-    bullet->entity.y = 0;
+    bullet->entity.y = SCREEN_Y_START_POS;
     bullet->entity.w = BULLET_WIDTH;
     bullet->entity.h = BULLET_HEIGHT;
     bullet->node.prev = NULL;
@@ -225,9 +239,22 @@ void updateEntityPosition(struct Entity *entity, int dx, int dy)
 {
     entity->x += dx;
     entity->y += dy;
+}
 
-    if (entity->x < 0) entity->x = 0;
-    if (entity->y < 0) entity->y = 0;
+void updatePlayerPosition(struct Player *player)
+{
+    struct Entity *e = &player->entity;
+    updateEntityPosition(e, player->dx, player->dy);
+
+    if (e->x < 0)
+	e->x = 0;
+    else if (e->x > SCREEN_WIDTH - e->w)
+	e->x = SCREEN_WIDTH - e->w;
+
+    if (e->y < SCREEN_Y_START_POS)
+	e->y = SCREEN_Y_START_POS;
+    else if (e->y > SCREEN_HEIGHT - e->h)
+	e->y = SCREEN_HEIGHT - e->h;
 }
 
 void placeEntity(struct Entity *entity)
@@ -346,13 +373,16 @@ void moveBullets(struct Bullet_Stage *bullet_stage, struct Enemy_Stage *enemy_st
     struct Bullet *bullet = bullet_stage->head;
 
     while (bullet) {
-	bullet->entity.x += BULLET_SPEED;
+	updateEntityPosition(&bullet->entity, BULLET_SPEED, 0);
+
 	int collision = unlinkCollisions(bullet, enemy_stage);
+
 	if (collision) {
 	    struct Bullet *next = getNextBullet(bullet);
 	    unlinkCollidedObjNode((struct Obj_Node **) &bullet_stage->head,
 				  (struct Obj_Node **) &bullet_stage->tail,
 				  &bullet->node);
+
 	    free_bullet(bullet);
 	    bullet = next;
 	} else {
@@ -383,11 +413,10 @@ void moveEnemyBullets(struct Bullet_Stage *enemy_bullet_stage,
 
     struct Bullet *bullet = enemy_bullet_stage->head;
     while (bullet) {
-	bullet->entity.x -= BULLET_SPEED;
+	updateEntityPosition(&bullet->entity, -(BULLET_SPEED), 0);
 
 	int collisionWithPlayer = checkForCollision(&bullet->entity, &player->entity);
-	int collisionWithHome = bullet->entity.x + bullet->entity.w >= 0
-	    && bullet->entity.x - bullet->entity.w <= 0;
+	int collisionWithHome = BEGINNING_OF_SCREEN_PASS_COND(bullet);
 
 	if (collisionWithPlayer || collisionWithHome) {
 	    struct Bullet *next = getNextBullet(bullet);
@@ -399,8 +428,10 @@ void moveEnemyBullets(struct Bullet_Stage *enemy_bullet_stage,
 
 	    if (collisionWithPlayer) {
 		player->self_health -= ENEMY_BULLET_DAMAGE;
+		printf("Player health: %d\n", player->self_health);
 	    } else {
-		player->home_health -= ENEMY_BULLET_DAMAGE;		
+		player->home_health -= ENEMY_BULLET_DAMAGE;
+		printf("Home health: %d\n", player->home_health);
 	    }
 	} else {
 	    bullet = getNextBullet(bullet);
@@ -422,7 +453,7 @@ void spawnEnemies(struct Enemy_Stage *enemy_stage)
 		      &enemy->node);
 }
 
-void moveEnemies(struct Enemy_Stage *enemy_stage)
+void moveEnemies(struct Enemy_Stage *enemy_stage, struct Player *player)
 {
     if (BEGINNING_OF_SCREEN_PASS_COND(enemy_stage->head)) {
 	struct Enemy *tmp = enemy_stage->head;
@@ -432,7 +463,14 @@ void moveEnemies(struct Enemy_Stage *enemy_stage)
     }
 
     for (struct Enemy *enemy = enemy_stage->head; enemy; enemy = getNextEnemy(enemy)) {
-	enemy->entity.x -= ENEMY_SPEED;
+	updateEntityPosition(&enemy->entity, -(ENEMY_SPEED), 0);
+	if (checkForCollision(&enemy->entity, &player->entity)) {
+	    unlinkCollidedObjNode((struct Obj_Node **) &enemy_stage->head,
+				  (struct Obj_Node **) &enemy_stage->tail,
+				  &enemy->node);
+	    player->self_health = 0;
+	    exit(1); // Find better way
+	}
     }
 }
 
@@ -495,10 +533,7 @@ void gameListener(struct Player *player, struct Bullet_Stage *bullet_stage)
 
 int main(void)
 {
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-	printf("Couldn't initialize SDL system: %s\n", SDL_GetError());
-	exit(1);
-    }
+    SDL_SafeInitialize(SDL_Init(SDL_INIT_VIDEO) >= 0, "SDL System");
 
     app.termination = 0;
     app.window = initialize_window();
@@ -507,10 +542,7 @@ int main(void)
 
     app.renderer = initialize_renderer(app.window);
 
-    if (!IMG_Init(IMG_INIT_PNG)) {
-	printf("Couldn't initialize image: %s\n", SDL_GetError());
-	exit(1);
-    }
+    SDL_SafeInitialize(IMG_Init(IMG_INIT_PNG), "image");
 
     struct Player player;
     initializePlayer(&player);
@@ -529,14 +561,14 @@ int main(void)
 	prepareScene();
 
 	gameListener(&player, &player_bullet_stage);
-	updateEntityPosition(&player.entity, player.dx, player.dy);
+	updatePlayerPosition(&player);
 
 	spawnEnemies(&enemy_stage);
 	spawnEnemyBullets(&enemy_stage, &enemy_bullet_stage);
 
 	moveBullets(&player_bullet_stage, &enemy_stage);
 	moveEnemyBullets(&enemy_bullet_stage, &player);
-	moveEnemies(&enemy_stage);
+	moveEnemies(&enemy_stage, &player);
 
 	placeEntity(&player.entity);
 	placeBulletStage(&player_bullet_stage);
@@ -550,12 +582,12 @@ int main(void)
     return 0;
 }
 
-// TODO: Manage memory leaks
-// TODO: Refactor repetitive codes
-// TODO: Player protects wall from enemy (will affect to score of player)
 // TODO: Handle better spawn strategy for enemy aircrafts
 // TODO: Make window dynamically resizable
 // TODO: Add audio
 // TODO: Add score table
 // TODO: Add cli args for changing game settings (text file config better)
-// TODO: Replace readme image with gif
+// TODO: Manage memory leaks
+// TODO: Refactor repetitive codes
+// TODO: Make better UI
+// TODO: Update readme
