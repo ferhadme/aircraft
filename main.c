@@ -194,7 +194,7 @@ void free_bullet(struct Bullet *bullet)
  */
 void initializePlayer(struct Player *player)
 {
-    player->entity.texture = IMG_LoadTexture(app.renderer, "aircraft.png");
+    player->entity.texture = IMG_LoadTexture(app.renderer, "res/aircraft.png");
     player->entity.x = PLAYER_START_POS_X;
     player->entity.y = PLAYER_START_POS_Y;
     player->entity.w = PLAYER_WIDTH;
@@ -208,12 +208,12 @@ void initializePlayer(struct Player *player)
 void initializeBullet(struct Bullet *bullet)
 {
     bullet->entity.x = 0;
-    bullet->entity.y = SCREEN_Y_START_POS;
+    bullet->entity.y = 0;
     bullet->entity.w = BULLET_WIDTH;
     bullet->entity.h = BULLET_HEIGHT;
     bullet->node.prev = NULL;
     bullet->node.next = NULL;
-    bullet->entity.texture = IMG_LoadTexture(app.renderer, "bullet.png");
+    bullet->entity.texture = IMG_LoadTexture(app.renderer, "res/bullet.png");
 }
 
 void initializeBulletStage(struct Bullet_Stage *bullet_stage)
@@ -225,7 +225,7 @@ void initializeEnemy(struct Enemy *enemy)
 {
     enemy->node.prev = NULL;
     enemy->node.next = NULL;
-    enemy->entity.texture = IMG_LoadTexture(app.renderer, "enemy.png");
+    enemy->entity.texture = IMG_LoadTexture(app.renderer, "res/enemy.png");
     enemy->entity.w = PLAYER_WIDTH;
     enemy->entity.h = PLAYER_HEIGHT;
     enemy->entity.x = SCREEN_WIDTH - enemy->entity.w;
