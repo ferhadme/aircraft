@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2024, Farhad Mehdizada (@ferhadme)
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -590,4 +594,5 @@ int main(void)
 // TODO: Manage memory leaks
 // TODO: Refactor repetitive codes
 // TODO: Make better UI
+// TODO: Make game harder as it progresses
 // TODO: Update readme
