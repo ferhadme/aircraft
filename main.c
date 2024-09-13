@@ -652,13 +652,17 @@ int main(void)
     return 0;
 }
 
-// TODO: Handle better spawn strategy for enemy aircrafts
-// TODO: Make window dynamically resizable
-// TODO: Add audio
-// TODO: Add score table
-// TODO: Add cli args for changing game settings (text file config better)
-// TODO: Manage memory leaks
-// TODO: Refactor repetitive codes
-// TODO: Make better UI
-// TODO: Make game harder as it progresses
-// TODO: Update readme
+/*
+ * Further improvements
+ *
+ * TODO: Find better spawn strategy for enemy aircrafts
+ * TODO: Make window dynamically resizable
+ * TODO: Add audio
+ * TODO: Add score table
+ * TODO: Add cli args for changing game settings (text file config better)
+ * TODO: Manage memory leaks
+ * TODO: Refactor repetitive codes
+ * TODO: Make better UI
+ * TODO: Make game harder as it progresses
+ * TODO: Update readme
+*/
