@@ -209,7 +209,7 @@ void free_bullet(Bullet *bullet)
  */
 void initialize_player(Player *player)
 {
-    player->entity.texture = IMG_LoadTexture(app.renderer, "res/aircraft.png");
+    player->entity.texture = IMG_LoadTexture(app.renderer, "gfx/aircraft.png");
     player->entity.x = PLAYER_START_POS_X;
     player->entity.y = PLAYER_START_POS_Y;
     player->entity.w = PLAYER_WIDTH;
@@ -228,7 +228,7 @@ void initialize_bullet(Bullet *bullet)
     bullet->entity.h = BULLET_HEIGHT;
     bullet->node.prev = NULL;
     bullet->node.next = NULL;
-    bullet->entity.texture = IMG_LoadTexture(app.renderer, "res/bullet.png");
+    bullet->entity.texture = IMG_LoadTexture(app.renderer, "gfx/bullet.png");
 }
 
 void initialize_enemy_stage(Enemy_Stage *enemy_stage)
@@ -248,7 +248,7 @@ void initialize_enemy(Enemy *enemy)
 {
     enemy->node.prev = NULL;
     enemy->node.next = NULL;
-    enemy->entity.texture = IMG_LoadTexture(app.renderer, "res/enemy.png");
+    enemy->entity.texture = IMG_LoadTexture(app.renderer, "gfx/enemy.png");
     enemy->entity.w = PLAYER_WIDTH;
     enemy->entity.h = PLAYER_HEIGHT;
     enemy->entity.x = SCREEN_WIDTH - enemy->entity.w;
@@ -554,6 +554,19 @@ void game_listener(Player *player, Bullet_Stage *bullet_stage)
     }
 }
 
+void cap_frame_rate(long *prev_frame)
+{
+    long current_frame = SDL_GetTicks();
+
+    long wait = 16 - (current_frame - *prev_frame);
+    if (wait < 1) {
+	wait = 1;
+    }
+
+    SDL_Delay(wait);
+    *prev_frame = SDL_GetTicks();
+}
+
 int main(void)
 {
     SDL_SafeInitialize(SDL_Init(SDL_INIT_VIDEO) >= 0, "SDL System");
@@ -579,8 +592,10 @@ int main(void)
     Enemy_Stage enemy_stage;
     memset(&enemy_stage, 0, sizeof(Enemy_Stage));
 
-    SDL_Event event;
+    long prev_frame = SDL_GetTicks();
+
     while (!app.termination) {
+
 	prepare_scene();
 
 	game_listener(&player, &player_bullet_stage);
@@ -599,10 +614,15 @@ int main(void)
 	place_enemy_stage(&enemy_stage);
 
 	present_scene();
-	SDL_Delay(16);
+
+	cap_frame_rate(&prev_frame);
     }
 
     // free(enemy_stage.spawn_slots);
+    SDL_DestroyRenderer(app.renderer);
+    SDL_DestroyWindow(app.window);
+
+    IMG_Quit();
     SDL_Quit();
 
     return 0;
