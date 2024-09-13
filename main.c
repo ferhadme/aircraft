@@ -61,14 +61,14 @@ typedef struct
     int y;
     int w;
     int h;
+    int dx;
+    int dy;
     SDL_Texture *texture;
 } Entity;
 
 typedef struct
 {
     Entity entity;
-    int dx;
-    int dy;
     int self_health;
     int home_health;
 } Player;
@@ -207,28 +207,50 @@ void free_bullet(Bullet *bullet)
 /*
  * Game objects initializers
  */
+void initialize_entity_coords(Entity *entity, int x, int y)
+{
+    entity->x = x;
+    entity->y = y;
+}
+
+void initialize_entity_size(Entity *entity, int w, int h)
+{
+    entity->w = w;
+    entity->h = h;
+}
+
+void initialize_entity_velocity(Entity *entity, int dx, int dy)
+{
+    entity->dx = dx;
+    entity->dy = dy;
+}
+
+void initialize_entity_texture(Entity *entity, const char *src)
+{
+    entity->texture = IMG_LoadTexture(app.renderer, src);
+}
+
 void initialize_player(Player *player)
 {
-    player->entity.texture = IMG_LoadTexture(app.renderer, "gfx/aircraft.png");
-    player->entity.x = PLAYER_START_POS_X;
-    player->entity.y = PLAYER_START_POS_Y;
-    player->entity.w = PLAYER_WIDTH;
-    player->entity.h = PLAYER_HEIGHT;
-    player->dx = 0;
-    player->dy = 0;
+    initialize_entity_texture(&player->entity, "gfx/aircraft.png");
+    initialize_entity_coords(&player->entity, PLAYER_START_POS_X, PLAYER_START_POS_Y);
+    initialize_entity_size(&player->entity, PLAYER_WIDTH, PLAYER_HEIGHT);
+    initialize_entity_velocity(&player->entity, 0, 0);
     player->self_health = PLAYER_HEALTH;
     player->home_health = HOME_HEALTH;
 }
 
-void initialize_bullet(Bullet *bullet)
+void initialize_bullet(Bullet *bullet, Entity *from)
 {
-    bullet->entity.x = 0;
-    bullet->entity.y = 0;
-    bullet->entity.w = BULLET_WIDTH;
-    bullet->entity.h = BULLET_HEIGHT;
+    initialize_entity_texture(&bullet->entity, "gfx/bullet.png");
+    initialize_entity_coords(&bullet->entity, from->x + from->w / 2.5, from->y + from->h / 2.5);
+    initialize_entity_size(&bullet->entity, BULLET_WIDTH, BULLET_HEIGHT);
+    initialize_entity_velocity(&bullet->entity, BULLET_WIDTH, BULLET_HEIGHT);
+    bullet->entity.dx = 0;
+    bullet->entity.dy = 0;
+
     bullet->node.prev = NULL;
     bullet->node.next = NULL;
-    bullet->entity.texture = IMG_LoadTexture(app.renderer, "gfx/bullet.png");
 }
 
 void initialize_enemy_stage(Enemy_Stage *enemy_stage)
@@ -246,28 +268,28 @@ void initialize_bullet_stage(Bullet_Stage *bullet_stage)
 
 void initialize_enemy(Enemy *enemy)
 {
+    enemy->entity.texture = IMG_LoadTexture(app.renderer, "gfx/enemy.png");
+    initialize_entity_texture(&enemy->entity, "gfx/enemy.png");
+    initialize_entity_coords(&enemy->entity, SCREEN_WIDTH - enemy->entity.w, get_spawn_coordinate());
+    initialize_entity_size(&enemy->entity, PLAYER_WIDTH, PLAYER_HEIGHT);
+    initialize_entity_velocity(&enemy->entity, -(ENEMY_SPEED), 0);
     enemy->node.prev = NULL;
     enemy->node.next = NULL;
-    enemy->entity.texture = IMG_LoadTexture(app.renderer, "gfx/enemy.png");
-    enemy->entity.w = PLAYER_WIDTH;
-    enemy->entity.h = PLAYER_HEIGHT;
-    enemy->entity.x = SCREEN_WIDTH - enemy->entity.w;
-    enemy->entity.y = get_spawn_coordinate();
 }
 
 /*
  * Game Entity position manipulation
  */
-void update_entity_position(Entity *entity, int dx, int dy)
+void update_entity_position(Entity *entity)
 {
-    entity->x += dx;
-    entity->y += dy;
+    entity->x += entity->dx;
+    entity->y += entity->dy;
 }
 
 void update_player_position(Player *player)
 {
     Entity *e = &player->entity;
-    update_entity_position(e, player->dx, player->dy);
+    update_entity_position(e);
 
     if (e->x < 0)
 	e->x = 0;
@@ -376,9 +398,9 @@ void handle_bullet_firing(Entity *from, Bullet_Stage *bullet_stage)
 {
     Bullet *bullet = malloc(sizeof(Bullet));
 
-    initialize_bullet(bullet);
+    initialize_bullet(bullet, from);
 
-    update_entity_position(&bullet->entity, from->x + from->w, from->y + from->h / 2.5);
+    update_entity_position(&bullet->entity);
     add_node_to_obj_stage((Obj_Node **) &bullet_stage->head,
 			  (Obj_Node **) &bullet_stage->tail,
 			  &bullet->node);
@@ -396,7 +418,8 @@ void move_bullets(Bullet_Stage *bullet_stage, Enemy_Stage *enemy_stage)
     Bullet *bullet = bullet_stage->head;
 
     while (bullet) {
-	update_entity_position(&bullet->entity, BULLET_SPEED, 0);
+	bullet->entity.dx = BULLET_SPEED;
+	update_entity_position(&bullet->entity);
 
 	int collision = unlink_collisions(bullet, enemy_stage);
 
@@ -436,7 +459,8 @@ void move_enemy_bullets(Bullet_Stage *enemy_bullet_stage,
 
     Bullet *bullet = enemy_bullet_stage->head;
     while (bullet) {
-	update_entity_position(&bullet->entity, -(BULLET_SPEED), 0);
+	bullet->entity.dx = -(ENEMY_BULLET_SPEED);
+	update_entity_position(&bullet->entity);
 
 	int collision_with_player = check_for_collision(&bullet->entity, &player->entity);
 	int collision_with_home = BEGINNING_OF_SCREEN_PASS_COND(bullet);
@@ -486,7 +510,7 @@ void move_enemies(Enemy_Stage *enemy_stage, Player *player)
     }
 
     for (Enemy *enemy = enemy_stage->head; enemy; enemy = get_next_enemy(enemy)) {
-	update_entity_position(&enemy->entity, -(ENEMY_SPEED), 0);
+	update_entity_position(&enemy->entity);
 	if (check_for_collision(&enemy->entity, &player->entity)) {
 	    unlink_collided_obj_node((Obj_Node **) &enemy_stage->head,
 				     (Obj_Node **) &enemy_stage->tail,
@@ -527,8 +551,8 @@ void on_key_listener(Player *player, Bullet_Stage *bullet_stage,
 	    break;
 	}
 
-	player->dx = dx;
-	player->dy = dy;
+	player->entity.dx = dx;
+	player->entity.dy = dy;
     }
 }
 
@@ -542,8 +566,8 @@ void game_listener(Player *player, Bullet_Stage *bullet_stage)
 	    on_key_listener(player, bullet_stage, &event.key);
 	    break;
 	case SDL_KEYUP:
-	    player->dx = 0;
-	    player->dy = 0;
+	    player->entity.dx = 0;
+	    player->entity.dy = 0;
 	    break;
 	case SDL_QUIT:
 	    app.termination = 1;
