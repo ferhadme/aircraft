@@ -1,3 +1,3 @@
 ### 2D Aircraft Game
 
-<img src="res/ss.png" />
+<img src="gfx/ss.png" />
