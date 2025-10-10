@@ -37,10 +37,10 @@
 #define ENEMY_SPAWN_PROBABILITY 10
 #define ENEMY_BULLET_SPAWN_PROBABILITY 3
 
-#define END_OF_SCREEN_PASS_COND(obj)		\
+#define END_OF_SCREEN_PASS_COND(obj)            \
     ((obj) && (obj->entity.x > SCREEN_WIDTH))
 
-#define BEGINNING_OF_SCREEN_PASS_COND(obj)	\
+#define BEGINNING_OF_SCREEN_PASS_COND(obj)      \
     ((obj) && (obj->entity.x < 0))
 
 #define SDL_INIT_ERR_TEMPLATE "Couldn't initialize %s: %s\n"
@@ -110,8 +110,8 @@ typedef struct
 void SDL_SafeInitialize(int initializer, const char *component)
 {
     if (!initializer) {
-	fprintf(stderr, SDL_INIT_ERR_TEMPLATE, component, SDL_GetError());
-	exit(1);
+        fprintf(stderr, SDL_INIT_ERR_TEMPLATE, component, SDL_GetError());
+        exit(1);
     }
 }
 
@@ -119,12 +119,12 @@ SDL_Window *initialize_window(void)
 {
     int windowFlags = 0;
     SDL_Window *window = SDL_CreateWindow("2D Aircraft Game",
-					  SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-					  SCREEN_WIDTH, SCREEN_HEIGHT, windowFlags);
+                                          SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+                                          SCREEN_WIDTH, SCREEN_HEIGHT, windowFlags);
 
     if (!window) {
-	fprintf(stderr, SDL_INIT_ERR_TEMPLATE, "window", SDL_GetError());
-	exit(1);
+        fprintf(stderr, SDL_INIT_ERR_TEMPLATE, "window", SDL_GetError());
+        exit(1);
     }
 
     return window;
@@ -136,8 +136,8 @@ SDL_Renderer *initialize_renderer(SDL_Window *window)
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, rendererFlags);
 
     if (!renderer) {
-	fprintf(stderr, SDL_INIT_ERR_TEMPLATE, "renderer", SDL_GetError());
-	exit(1);
+        fprintf(stderr, SDL_INIT_ERR_TEMPLATE, "renderer", SDL_GetError());
+        exit(1);
 
     }
 
@@ -292,14 +292,14 @@ void update_player_position(Player *player)
     update_entity_position(e);
 
     if (e->x < 0)
-	e->x = 0;
+        e->x = 0;
     else if (e->x > SCREEN_WIDTH - e->w)
-	e->x = SCREEN_WIDTH - e->w;
+        e->x = SCREEN_WIDTH - e->w;
 
     if (e->y < SCREEN_Y_START_POS)
-	e->y = SCREEN_Y_START_POS;
+        e->y = SCREEN_Y_START_POS;
     else if (e->y > SCREEN_HEIGHT - e->h)
-	e->y = SCREEN_HEIGHT - e->h;
+        e->y = SCREEN_HEIGHT - e->h;
 }
 
 void place_entity(Entity *entity)
@@ -316,14 +316,14 @@ void place_entity(Entity *entity)
 void place_bullet_stage(Bullet_Stage *bullet_stage)
 {
     for (Bullet *bullet = bullet_stage->head; bullet; bullet = get_next_bullet(bullet)) {
-	place_entity(&bullet->entity);
+        place_entity(&bullet->entity);
     }
 }
 
 void place_enemy_stage(Enemy_Stage *enemy_stage)
 {
     for (Enemy *enemy = enemy_stage->head; enemy; enemy = get_next_enemy(enemy)) {
-	place_entity(&enemy->entity);
+        place_entity(&enemy->entity);
     }
 }
 
@@ -331,19 +331,19 @@ void place_enemy_stage(Enemy_Stage *enemy_stage)
  * Object collisions
  */
 void unlink_collided_obj_node(Obj_Node **head, Obj_Node **tail,
-			      Obj_Node *collided)
+                              Obj_Node *collided)
 {
     if (collided == *head) {
-	if (collided == *tail) {
-	    *tail = NULL;
-	}
-	*head = (*head)->next;
+        if (collided == *tail) {
+            *tail = NULL;
+        }
+        *head = (*head)->next;
     } else if (collided == *tail) {
-	(*tail)->prev->next = NULL;
-	*tail = (*tail)->prev;
+        (*tail)->prev->next = NULL;
+        *tail = (*tail)->prev;
     } else {
-	collided->next->prev = collided->prev;
-	collided->prev->next = collided->next;
+        collided->next->prev = collided->prev;
+        collided->prev->next = collided->next;
     }
 }
 
@@ -351,35 +351,35 @@ void unlink_collided_obj_node(Obj_Node **head, Obj_Node **tail,
 int check_for_collision(Entity *e1, Entity *e2)
 {
     return e1->x + e1->w > e2->x &&
-	e2->x + e2->w > e1->x &&
-	e1->y + e1->h > e2->y &&
-	e2->y + e2->h > e1->y;
+        e2->x + e2->w > e1->x &&
+        e1->y + e1->h > e2->y &&
+        e2->y + e2->h > e1->y;
 }
 
 int unlink_collisions(Bullet *bullet, Enemy_Stage *enemy_stage)
 {
     for (Enemy *enemy = enemy_stage->head; enemy; enemy = get_next_enemy(enemy)) {
-	if (check_for_collision(&bullet->entity, &enemy->entity)) {
-	    unlink_collided_obj_node((Obj_Node **) &enemy_stage->head,
-				     (Obj_Node **) &enemy_stage->tail,
-				     &enemy->node);
-	    free_enemy(enemy);
-	    return 1;
-	}
+        if (check_for_collision(&bullet->entity, &enemy->entity)) {
+            unlink_collided_obj_node((Obj_Node **) &enemy_stage->head,
+                                     (Obj_Node **) &enemy_stage->tail,
+                                     &enemy->node);
+            free_enemy(enemy);
+            return 1;
+        }
     }
     return 0;
 }
 
 void add_node_to_obj_stage(Obj_Node **head, Obj_Node **tail,
-			   Obj_Node *obj_node)
+                           Obj_Node *obj_node)
 {
     if (!(*tail)) {
-	*head = obj_node;
-	*tail = obj_node;
+        *head = obj_node;
+        *tail = obj_node;
     } else {
-	(*tail)->next = obj_node;
-	obj_node->prev = *tail;
-	*tail = obj_node;
+        (*tail)->next = obj_node;
+        obj_node->prev = *tail;
+        *tail = obj_node;
     }
 }
 
@@ -387,7 +387,7 @@ void unlink_screen_passed_obj(Obj_Node **head, Obj_Node **tail)
 {
     *head = (*head)->next;
     if (!(*head)) {
-	*tail = NULL;
+        *tail = NULL;
     }
 }
 
@@ -402,87 +402,87 @@ void handle_bullet_firing(Entity *from, Bullet_Stage *bullet_stage)
 
     update_entity_position(&bullet->entity);
     add_node_to_obj_stage((Obj_Node **) &bullet_stage->head,
-			  (Obj_Node **) &bullet_stage->tail,
-			  &bullet->node);
+                          (Obj_Node **) &bullet_stage->tail,
+                          &bullet->node);
 }
 
 void move_bullets(Bullet_Stage *bullet_stage, Enemy_Stage *enemy_stage)
 {
     if (END_OF_SCREEN_PASS_COND(bullet_stage->head)) {
-	Bullet *tmp = bullet_stage->head;
-	unlink_screen_passed_obj((Obj_Node **) &bullet_stage->head,
-				 (Obj_Node **) &bullet_stage->tail);
-	free_bullet(tmp);
+        Bullet *tmp = bullet_stage->head;
+        unlink_screen_passed_obj((Obj_Node **) &bullet_stage->head,
+                                 (Obj_Node **) &bullet_stage->tail);
+        free_bullet(tmp);
     }
 
     Bullet *bullet = bullet_stage->head;
 
     while (bullet) {
-	bullet->entity.dx = BULLET_SPEED;
-	update_entity_position(&bullet->entity);
+        bullet->entity.dx = BULLET_SPEED;
+        update_entity_position(&bullet->entity);
 
-	int collision = unlink_collisions(bullet, enemy_stage);
+        int collision = unlink_collisions(bullet, enemy_stage);
 
-	if (collision) {
-	    Bullet *next = get_next_bullet(bullet);
-	    unlink_collided_obj_node((Obj_Node **) &bullet_stage->head,
-				     (Obj_Node **) &bullet_stage->tail,
-				     &bullet->node);
+        if (collision) {
+            Bullet *next = get_next_bullet(bullet);
+            unlink_collided_obj_node((Obj_Node **) &bullet_stage->head,
+                                     (Obj_Node **) &bullet_stage->tail,
+                                     &bullet->node);
 
-	    free_bullet(bullet);
-	    bullet = next;
-	} else {
-	    bullet = get_next_bullet(bullet);
-	}
+            free_bullet(bullet);
+            bullet = next;
+        } else {
+            bullet = get_next_bullet(bullet);
+        }
     }
 }
 
 void spawn_enemy_bullets(Enemy_Stage *enemy_stage,
-			 Bullet_Stage *enemy_bullet_stage)
+                         Bullet_Stage *enemy_bullet_stage)
 {
     for (Enemy *enemy = enemy_stage->head; enemy; enemy = get_next_enemy(enemy)) {
-	if (spawn(ENEMY_BULLET_SPAWN_PROBABILITY)) {
-	    handle_bullet_firing(&enemy->entity, enemy_bullet_stage);
-	}
+        if (spawn(ENEMY_BULLET_SPAWN_PROBABILITY)) {
+            handle_bullet_firing(&enemy->entity, enemy_bullet_stage);
+        }
     }
 }
 
 void move_enemy_bullets(Bullet_Stage *enemy_bullet_stage,
-		      Player *player)
+                        Player *player)
 {
     if (BEGINNING_OF_SCREEN_PASS_COND(enemy_bullet_stage->head)) {
-	Bullet *tmp = enemy_bullet_stage->head;
-	unlink_screen_passed_obj((Obj_Node **) &enemy_bullet_stage->head,
-				 (Obj_Node **) &enemy_bullet_stage->tail);
-	free_bullet(tmp);
+        Bullet *tmp = enemy_bullet_stage->head;
+        unlink_screen_passed_obj((Obj_Node **) &enemy_bullet_stage->head,
+                                 (Obj_Node **) &enemy_bullet_stage->tail);
+        free_bullet(tmp);
     }
 
     Bullet *bullet = enemy_bullet_stage->head;
     while (bullet) {
-	bullet->entity.dx = -(ENEMY_BULLET_SPEED);
-	update_entity_position(&bullet->entity);
+        bullet->entity.dx = -(ENEMY_BULLET_SPEED);
+        update_entity_position(&bullet->entity);
 
-	int collision_with_player = check_for_collision(&bullet->entity, &player->entity);
-	int collision_with_home = BEGINNING_OF_SCREEN_PASS_COND(bullet);
+        int collision_with_player = check_for_collision(&bullet->entity, &player->entity);
+        int collision_with_home = BEGINNING_OF_SCREEN_PASS_COND(bullet);
 
-	if (collision_with_player || collision_with_home) {
-	    Bullet *next = get_next_bullet(bullet);
-	    unlink_collided_obj_node((Obj_Node **) &enemy_bullet_stage->head,
-				     (Obj_Node **) &enemy_bullet_stage->tail,
-				     &bullet->node);
-	    free_bullet(bullet);
-	    bullet = next;
+        if (collision_with_player || collision_with_home) {
+            Bullet *next = get_next_bullet(bullet);
+            unlink_collided_obj_node((Obj_Node **) &enemy_bullet_stage->head,
+                                     (Obj_Node **) &enemy_bullet_stage->tail,
+                                     &bullet->node);
+            free_bullet(bullet);
+            bullet = next;
 
-	    if (collision_with_player) {
-		player->self_health -= ENEMY_BULLET_DAMAGE;
-		printf("Player health: %d\n", player->self_health);
-	    } else {
-		player->home_health -= ENEMY_BULLET_DAMAGE;
-		printf("Home health: %d\n", player->home_health);
-	    }
-	} else {
-	    bullet = get_next_bullet(bullet);
-	}
+            if (collision_with_player) {
+                player->self_health -= ENEMY_BULLET_DAMAGE;
+                printf("Player health: %d\n", player->self_health);
+            } else {
+                player->home_health -= ENEMY_BULLET_DAMAGE;
+                printf("Home health: %d\n", player->home_health);
+            }
+        } else {
+            bullet = get_next_bullet(bullet);
+        }
     }
 }
 
@@ -496,28 +496,28 @@ void spawn_enemies(Enemy_Stage *enemy_stage)
     initialize_enemy(enemy);
 
     add_node_to_obj_stage((Obj_Node **) &enemy_stage->head,
-		      (Obj_Node **) &enemy_stage->tail,
-		      &enemy->node);
+                          (Obj_Node **) &enemy_stage->tail,
+                          &enemy->node);
 }
 
 void move_enemies(Enemy_Stage *enemy_stage, Player *player)
 {
     if (BEGINNING_OF_SCREEN_PASS_COND(enemy_stage->head)) {
-	Enemy *tmp = enemy_stage->head;
-	unlink_screen_passed_obj((Obj_Node **) &enemy_stage->head,
-				 (Obj_Node **) &enemy_stage->tail);
-	free_enemy(tmp);
+        Enemy *tmp = enemy_stage->head;
+        unlink_screen_passed_obj((Obj_Node **) &enemy_stage->head,
+                                 (Obj_Node **) &enemy_stage->tail);
+        free_enemy(tmp);
     }
 
     for (Enemy *enemy = enemy_stage->head; enemy; enemy = get_next_enemy(enemy)) {
-	update_entity_position(&enemy->entity);
-	if (check_for_collision(&enemy->entity, &player->entity)) {
-	    unlink_collided_obj_node((Obj_Node **) &enemy_stage->head,
-				     (Obj_Node **) &enemy_stage->tail,
-				     &enemy->node);
-	    player->self_health = 0;
-	    exit(1); // Find better way
-	}
+        update_entity_position(&enemy->entity);
+        if (check_for_collision(&enemy->entity, &player->entity)) {
+            unlink_collided_obj_node((Obj_Node **) &enemy_stage->head,
+                                     (Obj_Node **) &enemy_stage->tail,
+                                     &enemy->node);
+            player->self_health = 0;
+            exit(1); // Find better way
+        }
     }
 }
 
@@ -525,34 +525,34 @@ void move_enemies(Enemy_Stage *enemy_stage, Player *player)
  * Event loop listeners
  */
 void on_key_listener(Player *player, Bullet_Stage *bullet_stage,
-		     SDL_KeyboardEvent *event)
+                     SDL_KeyboardEvent *event)
 {
     if (event->repeat == 0) {
-	int dx = 0;
-	int dy = 0;
+        int dx = 0;
+        int dy = 0;
 
-	switch (event->keysym.scancode) {
-	case SDL_SCANCODE_UP:
-	    dy = -(PLAYER_SPEED);
-	    break;
-	case SDL_SCANCODE_DOWN:
-	    dy = PLAYER_SPEED;
-	    break;
-	case SDL_SCANCODE_RIGHT:
-	    dx = PLAYER_SPEED;
-	    break;
-	case SDL_SCANCODE_LEFT:
-	    dx = -(PLAYER_SPEED);
-	    break;
-	case SDL_SCANCODE_LCTRL:
-	    handle_bullet_firing(&player->entity, bullet_stage);
-	    break;
-	default:
-	    break;
-	}
+        switch (event->keysym.scancode) {
+        case SDL_SCANCODE_UP:
+            dy = -(PLAYER_SPEED);
+            break;
+        case SDL_SCANCODE_DOWN:
+            dy = PLAYER_SPEED;
+            break;
+        case SDL_SCANCODE_RIGHT:
+            dx = PLAYER_SPEED;
+            break;
+        case SDL_SCANCODE_LEFT:
+            dx = -(PLAYER_SPEED);
+            break;
+        case SDL_SCANCODE_LCTRL:
+            handle_bullet_firing(&player->entity, bullet_stage);
+            break;
+        default:
+            break;
+        }
 
-	player->entity.dx = dx;
-	player->entity.dy = dy;
+        player->entity.dx = dx;
+        player->entity.dy = dy;
     }
 }
 
@@ -561,20 +561,20 @@ void game_listener(Player *player, Bullet_Stage *bullet_stage)
     SDL_Event event;
 
     while (SDL_PollEvent(&event)) {
-	switch (event.type) {
-	case SDL_KEYDOWN:
-	    on_key_listener(player, bullet_stage, &event.key);
-	    break;
-	case SDL_KEYUP:
-	    player->entity.dx = 0;
-	    player->entity.dy = 0;
-	    break;
-	case SDL_QUIT:
-	    app.termination = 1;
-	    break;
-	default:
-	    break;
-	}
+        switch (event.type) {
+        case SDL_KEYDOWN:
+            on_key_listener(player, bullet_stage, &event.key);
+            break;
+        case SDL_KEYUP:
+            player->entity.dx = 0;
+            player->entity.dy = 0;
+            break;
+        case SDL_QUIT:
+            app.termination = 1;
+            break;
+        default:
+            break;
+        }
     }
 }
 
@@ -584,7 +584,7 @@ void cap_frame_rate(long *prev_frame)
 
     long wait = 16 - (current_frame - *prev_frame);
     if (wait < 1) {
-	wait = 1;
+        wait = 1;
     }
 
     SDL_Delay(wait);
@@ -620,26 +620,26 @@ int main(void)
 
     while (!app.termination) {
 
-	prepare_scene();
+        prepare_scene();
 
-	game_listener(&player, &player_bullet_stage);
-	update_player_position(&player);
+        game_listener(&player, &player_bullet_stage);
+        update_player_position(&player);
 
-	spawn_enemies(&enemy_stage);
-	spawn_enemy_bullets(&enemy_stage, &enemy_bullet_stage);
+        spawn_enemies(&enemy_stage);
+        spawn_enemy_bullets(&enemy_stage, &enemy_bullet_stage);
 
-	move_bullets(&player_bullet_stage, &enemy_stage);
-	move_enemy_bullets(&enemy_bullet_stage, &player);
-	move_enemies(&enemy_stage, &player);
+        move_bullets(&player_bullet_stage, &enemy_stage);
+        move_enemy_bullets(&enemy_bullet_stage, &player);
+        move_enemies(&enemy_stage, &player);
 
-	place_entity(&player.entity);
-	place_bullet_stage(&player_bullet_stage);
-	place_bullet_stage(&enemy_bullet_stage);
-	place_enemy_stage(&enemy_stage);
+        place_entity(&player.entity);
+        place_bullet_stage(&player_bullet_stage);
+        place_bullet_stage(&enemy_bullet_stage);
+        place_enemy_stage(&enemy_stage);
 
-	present_scene();
+        present_scene();
 
-	cap_frame_rate(&prev_frame);
+        cap_frame_rate(&prev_frame);
     }
 
     // free(enemy_stage.spawn_slots);
@@ -665,4 +665,4 @@ int main(void)
  * TODO: Make better UI
  * TODO: Make game harder as it progresses
  * TODO: Update readme
-*/
+ */
