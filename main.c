@@ -5,8 +5,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
+#include <SDL.h>
+#include <SDL_image.h>
 
 /*
  * Game settings
@@ -101,7 +101,6 @@ typedef struct
 {
     Enemy *head;
     Enemy *tail;
-    int *spawn_slots;
 } Enemy_Stage;
 
 /*
@@ -172,14 +171,6 @@ int get_spawn_coordinate()
     int min = SCREEN_Y_START_POS;
     int max = SCREEN_HEIGHT - PLAYER_HEIGHT;
     return (rand() % (max - min + 1)) + min;
-    // int offset = (rand() % (max - min + 1)) + min;
-
-    // if (*(spawn_slots + offset) == 0) {
-    // 	*(spawn_slots + offset) == 1;
-    // 	return offset;
-    // }
-
-    // return getSpawnCoordinate(spawn_slots);
 }
 
 Bullet *get_next_bullet(Bullet *bullet)
@@ -256,9 +247,6 @@ void initialize_bullet(Bullet *bullet, Entity *from)
 void initialize_enemy_stage(Enemy_Stage *enemy_stage)
 {
     memset(enemy_stage, 0, sizeof(Enemy_Stage));
-    // int possible_slot_len = (SCREEN_HEIGHT - height) - SCREEN_Y_START_POS + 1;
-    // enemy_stage->spawn_slots = malloc(possible_slot_len * sizeof(int));
-    // memset(enemy_stage->spawn_slots, 0, possible_slot_len * sizeof(int));
 }
 
 void initialize_bullet_stage(Bullet_Stage *bullet_stage)
@@ -642,7 +630,6 @@ int main(void)
         cap_frame_rate(&prev_frame);
     }
 
-    // free(enemy_stage.spawn_slots);
     SDL_DestroyRenderer(app.renderer);
     SDL_DestroyWindow(app.window);
 
